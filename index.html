@@ -137,5 +137,25 @@ function animate() {
 }
 spawnEnemy(); animate();
 </script>
+    // Автоматическая стрельба и движение пальцем для Telegram
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    // Халид плавно перемещается к пальцу
+    player.x += (touch.clientX - player.x) * 0.2;
+    player.y += (touch.clientY - player.y) * 0.2;
+
+    // Включаем музыку при первом касании
+    if (bgMusic.paused) bgMusic.play();
+
+    // Каждые 5 кадров создаем пулю в случайном направлении
+    if (Math.random() < 0.2) {
+        const angle = Math.random() * Math.PI * 2;
+        projectiles.push({x: player.x, y: player.y, vx: Math.cos(angle)*12, vy: Math.sin(angle)*12});
+    }
+}, {passive: false});
+
+</script>
 </body>
 </html>
+
