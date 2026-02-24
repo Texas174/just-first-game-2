@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ТЯЖЕЛЫЕ БУДНИ HALID: UNLOCKED</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; color: #ff0000; font-family: 'Courier New', monospace; }
+        canvas { display: block; background: #050505; }
+        #ui { 
+            position: absolute; top: 20px; left: 20px; font-size: 18px; 
+            pointer-events: none; text-shadow: 0 0 10px #f00; border-left: 3px solid #f00; padding-left: 15px;
+        }
+        .active-bonus { color: #0ff; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <b>ТЯЖЕЛЫЕ БУДНИ HALID</b><br>
+        ОЧКИ СВОБОДЫ: <span id="score">0</span> сек.<br>
+        <div id="bonus-status"></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const bonusEl = document.getElementById('bonus-status');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const player = { x: canvas.width/2, y: canvas.height/2, speed: 7, label: "HALID", vpn: false, superGun: false };
+const projectiles = [];
+const enemies = [];
+const powerups = [];
+let score = 0;
+const keys = {};
+
+const threatLabels = ["СТАТЬЯ 282", "АВТОЗАК", "БЛОКИРОВКА", "ДОНОС", "ИНОАГЕНТ", "ПРОПОГАНДА", "СОЛОВЬЕВ", "Z.O.V", "ИХ ТАМ НЕТ", "8 ЛЕТ!!!"];
+
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+window.addEventListener('mousedown', (e) => {
+    const angle = Math.atan2(e.clientY - player.y, e.clientX - player.x);
+    const shoot = (ang) => projectiles.push({x: player.x, y: player.y, vx: Math.cos(ang)*15, vy: Math.sin(ang)*15});
+    
+    shoot(angle);
+    if (player.superGun) { // Дополнительные пули при бонусе
+        shoot(angle + 0.2);
+        shoot(angle - 0.2);
+    }
+});
+
+function spawnPowerup() {
+    const types = [{name: 'VPN', color: '#0ff'}, {name: 'КОРРУПЦИЯ', color: '#ffd700'}];
+    const type = types[Math.floor(Math.random() * types.length)];
+    powerups.push({
+        x: Math.random() * (canvas.width - 50) + 25,
+        y: Math.random() * (canvas.height - 50) + 25,
+        type: type.name,
+        color: type.color
+    });
+}
+
+function spawnEnemy() {
+    setInterval(() => {
+        let x, y;
+        if (Math.random() < 0.5) { x = Math.random() < 0.5 ? -50 : canvas.width + 50; y = Math.random() * canvas.height; }
+        else { x = Math.random() * canvas.width; y = Math.random() < 0.5 ? -50 : canvas.height + 50; }
+        const angle = Math.atan2(player.y - y, player.x - x);
+        enemies.push({ x, y, vx: Math.cos(angle)*(3 + score/100), vy: Math.sin(angle)*(3 + score/100), label: threatLabels[Math.floor(Math.random()*threatLabels.length)] });
+        
+        if (score > 0 && score % 20 === 0 && powerups.length === 0) spawnPowerup(); 
+    }, 800);
+}
+
+function animate() {
+    const animationId = requestAnimationFrame(animate);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (keys['KeyW']) player.y -= player.speed; if (keys['KeyS']) player.y += player.speed;
+    if (keys['KeyA']) player.x -= player.speed; if (keys['KeyD']) player.x += player.speed;
+
+    // Отрисовка VPN щита
+    if (player.vpn) {
+        ctx.beginPath(); ctx.arc(player.x, player.y, 40, 0, Math.PI*2);
+        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace";
+    ctx.fillText(player.label, player.x - 20, player.y + 5);
+
+    // Бонусы на земле
+    powerups.forEach((pw, i) => {
+        ctx.fillStyle = pw.color; ctx.font = "bold 12px monospace";
+        ctx.fillText("[" + pw.type + "]", pw.x, pw.y);
+        if (Math.hypot(player.x - pw.x, player.y - pw.y) < 30) {
+            if (pw.type === 'VPN') { 
+                player.vpn = true; bonusEl.innerHTML = "<span class='active-bonus'>ЗАЩИТА VPN АКТИВНА</span>";
+                setTimeout(() => { player.vpn = false; bonusEl.innerHTML = ""; }, 7000);
+            } else {
+                player.superGun = true; bonusEl.innerHTML = "<span class='active-bonus' style='color:gold'>РЕЖИМ: КОРРУПЦИЯ</span>";
+                setTimeout(() => { player.superGun = false; bonusEl.innerHTML = ""; }, 10000);
+            }
+            powerups.splice(i, 1);
+        }
+    });
+
+    projectiles.forEach((p, pi) => {
+        p.x += p.vx; p.y += p.vy; ctx.fillStyle = '#fff'; ctx.fillRect(p.x, p.y, 4, 4);
+        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(pi, 1);
+    });
+
+    enemies.forEach((en, ei) => {
+        en.x += en.vx; en.y += en.vy; ctx.fillStyle = "#f00"; ctx.fillText(en.label, en.x, en.y);
+
+        const dist = Math.hypot(player.x - en.x, player.y - en.y);
+        if (dist < 30) {
+            if (player.vpn) { enemies.splice(ei, 1); score += 5; scoreEl.innerText = score; } // Враг разбивается о щит
+            else {
+                cancelAnimationFrame(animationId);
+                ctx.fillStyle = "white"; ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = "black"; ctx.textAlign = "center"; ctx.font = "bold 30px monospace";
+                ctx.fillText("halid был задержан за лайк ФБК", canvas.width/2, canvas.height/2);
+                setTimeout(() => location.reload(), 4000);
+            }
+        }
+
+        projectiles.forEach((p, pi) => {
+            if (Math.hypot(p.x - en.x, p.y - en.y) < 35) { enemies.splice(ei, 1); projectiles.splice(pi, 1); score++; scoreEl.innerText = score; }
+        });
+    });
+}
+spawnEnemy(); animate();
+</script>
+</body>
+</html>
